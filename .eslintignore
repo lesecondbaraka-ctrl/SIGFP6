@@ -1,0 +1,5 @@
+# Ignore generated build artifacts
+**/dist/**
+node_modules/
+build/
+.vite/
