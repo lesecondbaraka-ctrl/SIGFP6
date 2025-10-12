@@ -1,0 +1,8 @@
+#!/bin/sh
+# Simple pre-commit hook to run the scanner
+node ./scripts/scan-secrets.js
+STATUS=$?
+if [ $STATUS -ne 0 ]; then
+  echo "Pre-commit hook: secret scan failed. Aborting commit."
+  exit $STATUS
+fi
