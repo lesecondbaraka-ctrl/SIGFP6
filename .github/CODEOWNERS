@@ -1,0 +1,8 @@
+# Propriétaires par défaut
+* @bahatilegrand
+
+# Dossiers clés (optionnel, ajoutez d'autres owners si besoin)
+/src/components/ @bahatilegrand
+/src/services/ @bahatilegrand
+/src/hooks/ @bahatilegrand
+/src/types/ @bahatilegrand

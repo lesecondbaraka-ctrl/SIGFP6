@@ -1,0 +1,1 @@
+chore(security): retirer clés en dur des scripts et préparer le dépôt pour passage en public
