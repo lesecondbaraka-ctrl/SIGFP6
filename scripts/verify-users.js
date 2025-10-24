@@ -1,7 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://hhbjkrdazcnmwqdpczhr.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoYmprcmRhemNubXdxZHBjemhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1MDA5NjgsImV4cCI6MjA3MzA3Njk2OH0.ij_lSBoJmbuCW5nMBkUibBVoCG5nenPItHrWdsJ9Ipg';
+// Read from environment variables to avoid hardcoding secrets
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ Variables d\'environnement manquantes: SUPABASE_URL et/ou SUPABASE_KEY.');
+  console.error('   Définissez-les puis relancez ce script.');
+  process.exit(1);
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
