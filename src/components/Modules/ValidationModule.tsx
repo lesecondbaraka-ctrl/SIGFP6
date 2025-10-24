@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import { CheckCircle, XCircle, Clock, FileText, User, Shield, Calendar } from 'lucide-react';
+import { 
+  CheckCircle, XCircle, Clock, FileText, User, Calendar, Shield, Download, AlertCircle
+} from 'lucide-react';
+
+/**
+ * Module Validation - Workflow validation multi-niveaux
+ * Circuit de validation configurable
+ * Statistiques temps réel
+ */
 
 interface DocumentValidation {
   id: string;
@@ -18,7 +26,13 @@ interface DocumentValidation {
 
 export default function ValidationModule() {
   const [activeTab, setActiveTab] = useState('en-attente');
-  const [_selectedDocument, _setSelectedDocument] = useState<DocumentValidation | null>(null);
+  const [showValidateModal, setShowValidateModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showRevisionModal, setShowRevisionModal] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<DocumentValidation | null>(null);
+  const [validationComment, setValidationComment] = useState('');
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [revisionRequest, setRevisionRequest] = useState('');
 
   const documents: DocumentValidation[] = [
     {
@@ -346,19 +360,44 @@ export default function ValidationModule() {
                       
                       {document.statut === 'En attente' && (
                         <div className="flex items-center space-x-3">
-                          <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2">
+                          <button 
+                            onClick={() => {
+                              setSelectedDocument(document);
+                              setShowValidateModal(true);
+                            }}
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                          >
                             <CheckCircle className="h-4 w-4" />
                             <span>Valider</span>
                           </button>
-                          <button className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2">
+                          <button 
+                            onClick={() => {
+                              setSelectedDocument(document);
+                              setShowRejectModal(true);
+                            }}
+                            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
+                          >
                             <XCircle className="h-4 w-4" />
                             <span>Rejeter</span>
                           </button>
-                          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2">
+                          <button 
+                            onClick={() => {
+                              setSelectedDocument(document);
+                              setShowRevisionModal(true);
+                            }}
+                            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                          >
                             <FileText className="h-4 w-4" />
                             <span>Demander Révision</span>
                           </button>
                         </div>
+                      )}
+                      
+                      {(document.statut === 'Validé' || document.statut === 'Rejeté') && (
+                        <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2">
+                          <Download className="h-4 w-4" />
+                          <span>Télécharger Certificat</span>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -375,6 +414,206 @@ export default function ValidationModule() {
           </div>
         </div>
       </div>
+
+      {/* Modal Validation */}
+      {showValidateModal && selectedDocument && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-8 max-w-2xl w-full shadow-2xl">
+            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+              <CheckCircle className="h-6 w-6 mr-2 text-green-600" />
+              Valider le Document
+            </h3>
+            
+            <div className="bg-green-50 p-4 rounded-lg border border-green-200 mb-6">
+              <p className="text-sm font-bold text-green-900 mb-2">{selectedDocument.nom}</p>
+              <div className="grid grid-cols-2 gap-3 text-xs text-green-800">
+                <div><strong>Type:</strong> {selectedDocument.type}</div>
+                <div><strong>Montant:</strong> {selectedDocument.montant ? formatCurrency(selectedDocument.montant) : 'N/A'}</div>
+                <div><strong>Demandeur:</strong> {selectedDocument.demandeur}</div>
+                <div><strong>Entité:</strong> {selectedDocument.entite}</div>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Commentaire de validation (optionnel)
+              </label>
+              <textarea
+                value={validationComment}
+                onChange={(e) => setValidationComment(e.target.value)}
+                placeholder="Ajoutez un commentaire sur cette validation..."
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                rows={4}
+              />
+            </div>
+
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-6">
+              <p className="text-xs text-blue-800">
+                <strong>Attention:</strong> La validation de ce document est irréversible. Assurez-vous que toutes les vérifications ont été effectuées.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowValidateModal(false);
+                  setSelectedDocument(null);
+                  setValidationComment('');
+                }}
+                className="px-6 py-2.5 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium transition-all"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => {
+                  console.log('Document validé:', selectedDocument.id, validationComment);
+                  setShowValidateModal(false);
+                  setSelectedDocument(null);
+                  setValidationComment('');
+                }}
+                className="px-6 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 font-medium transition-all shadow-md"
+              >
+                Confirmer la Validation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Rejet */}
+      {showRejectModal && selectedDocument && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-8 max-w-2xl w-full shadow-2xl">
+            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+              <XCircle className="h-6 w-6 mr-2 text-red-600" />
+              Rejeter le Document
+            </h3>
+            
+            <div className="bg-red-50 p-4 rounded-lg border border-red-200 mb-6">
+              <p className="text-sm font-bold text-red-900 mb-2">{selectedDocument.nom}</p>
+              <div className="grid grid-cols-2 gap-3 text-xs text-red-800">
+                <div><strong>Type:</strong> {selectedDocument.type}</div>
+                <div><strong>Montant:</strong> {selectedDocument.montant ? formatCurrency(selectedDocument.montant) : 'N/A'}</div>
+                <div><strong>Demandeur:</strong> {selectedDocument.demandeur}</div>
+                <div><strong>Entité:</strong> {selectedDocument.entite}</div>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Motif du rejet *
+              </label>
+              <textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Décrivez en détail les raisons du rejet (obligatoire)..."
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                rows={5}
+              />
+            </div>
+
+            <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 mb-6">
+              <div className="flex items-start">
+                <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
+                <p className="text-xs text-yellow-800">
+                  <strong>Important:</strong> Le demandeur sera notifié du rejet avec le motif indiqué. Soyez précis et constructif.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowRejectModal(false);
+                  setSelectedDocument(null);
+                  setRejectionReason('');
+                }}
+                className="px-6 py-2.5 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium transition-all"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => {
+                  console.log('Document rejeté:', selectedDocument.id, rejectionReason);
+                  setShowRejectModal(false);
+                  setSelectedDocument(null);
+                  setRejectionReason('');
+                }}
+                disabled={!rejectionReason.trim()}
+                className="px-6 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all shadow-md"
+              >
+                Confirmer le Rejet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Demande de Révision */}
+      {showRevisionModal && selectedDocument && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-8 max-w-2xl w-full shadow-2xl">
+            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+              <FileText className="h-6 w-6 mr-2 text-blue-600" />
+              Demander une Révision
+            </h3>
+            
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-6">
+              <p className="text-sm font-bold text-blue-900 mb-2">{selectedDocument.nom}</p>
+              <div className="grid grid-cols-2 gap-3 text-xs text-blue-800">
+                <div><strong>Type:</strong> {selectedDocument.type}</div>
+                <div><strong>Montant:</strong> {selectedDocument.montant ? formatCurrency(selectedDocument.montant) : 'N/A'}</div>
+                <div><strong>Demandeur:</strong> {selectedDocument.demandeur}</div>
+                <div><strong>Entité:</strong> {selectedDocument.entite}</div>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Éléments à réviser *
+              </label>
+              <textarea
+                value={revisionRequest}
+                onChange={(e) => setRevisionRequest(e.target.value)}
+                placeholder="Listez les éléments qui nécessitent une révision ou des clarifications..."
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                rows={5}
+              />
+            </div>
+
+            <div className="bg-green-50 p-4 rounded-lg border border-green-200 mb-6">
+              <p className="text-xs text-green-800">
+                <strong>Note:</strong> Le document sera renvoyé au demandeur pour correction. Il pourra le resoumettre après modifications.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowRevisionModal(false);
+                  setSelectedDocument(null);
+                  setRevisionRequest('');
+                }}
+                className="px-6 py-2.5 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium transition-all"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => {
+                  console.log('Révision demandée:', selectedDocument.id, revisionRequest);
+                  setShowRevisionModal(false);
+                  setSelectedDocument(null);
+                  setRevisionRequest('');
+                }}
+                disabled={!revisionRequest.trim()}
+                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all shadow-md"
+              >
+                Envoyer la Demande
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,13 +1,3 @@
-// Exercice comptable
-export interface ExerciceComptable {
-  id: string;
-  annee: number;
-  date_cloture: string;
-  devise: string;
-  statut: 'brouillon' | 'valide' | 'archivé';
-  created_at: string;
-}
-
 // Bilan Actif
 export interface BilanActif {
   id: string;

@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { BilanPassif } from '../types/finance';
+import type { BilanPassif } from '../types/finance';
 
 export const useBilanPassif = (exerciceId: string) => {
   const [passif, setPassif] = useState<BilanPassif[]>([]);
@@ -13,7 +12,7 @@ export const useBilanPassif = (exerciceId: string) => {
       .select('*')
       .eq('exercice_id', exerciceId)
       .order('ordre')
-      .then(({ data, error }) => {
+      .then(({ data, error }: { data: any; error: any }) => {
         if (error) console.error(error);
         setPassif(data || []);
         setLoading(false);

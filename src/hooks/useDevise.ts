@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DeviseCode } from '../services/formatMontant';
+import { DeviseCode } from '../utils/exportUtils';
 
 export const useDevise = (defaultDevise: DeviseCode = 'USD') => {
   const [devise, setDevise] = useState<DeviseCode>(defaultDevise);

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Search, Download, BarChart3, Filter } from 'lucide-react';
+import { exportToExcel, generateFilename } from '../../utils/exportUtils';
 
 interface EcritureComptable {
   id: string;
@@ -23,12 +24,37 @@ interface CompteComptable {
   solde: number;
 }
 
-export default function JournalModule() {
+type JournalProps = {
+  ecritures?: any[];
+  comptes?: any[];
+  onFiltersChange?: (filters: {
+    q: string;
+    journal: string;
+    entite: string;
+    statut: string;
+    dateFrom: string;
+    dateTo: string;
+  }) => void;
+  onCreateRequested?: () => void;
+};
+
+export default function JournalModule({ ecritures: ecrituresProp, comptes: comptesProp, onFiltersChange, onCreateRequested }: JournalProps = {}) {
+  const now = new Date();
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const toISO = (d: Date) => d.toISOString().slice(0, 10);
+  const currentPeriodLabel = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(now);
+
   const [activeTab, setActiveTab] = useState('journal');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPeriod, setSelectedPeriod] = useState('Janvier 2024');
+  const [selectedPeriod, setSelectedPeriod] = useState(currentPeriodLabel.charAt(0).toUpperCase() + currentPeriodLabel.slice(1));
+  const [filterJournal, setFilterJournal] = useState<string>('');
+  const [filterEntite, setFilterEntite] = useState<string>('');
+  const [filterStatut, setFilterStatut] = useState<string>('Validée');
+  const [dateFrom, setDateFrom] = useState<string>(toISO(firstDay));
+  const [dateTo, setDateTo] = useState<string>(toISO(lastDay));
 
-  const ecritures: EcritureComptable[] = [
+  const defaultEcritures: EcritureComptable[] = [
     {
       id: '1',
       date: '2024-01-15',
@@ -79,7 +105,28 @@ export default function JournalModule() {
     }
   ];
 
-  const comptes: CompteComptable[] = [
+  // Remonter les filtres au parent (ComptabiliteModule) pour data fetching côté service
+  useEffect(() => {
+    onFiltersChange?.({
+      q: searchTerm,
+      journal: filterJournal,
+      entite: filterEntite,
+      statut: filterStatut,
+      dateFrom,
+      dateTo,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, filterJournal, filterEntite, filterStatut, dateFrom, dateTo]);
+
+  const entiteOptions = useMemo(() => {
+    const set = new Set<string>();
+    (ecrituresProp ?? defaultEcritures).forEach((e: any) => {
+      if (e?.entite) set.add(String(e.entite));
+    });
+    return Array.from(set).sort();
+  }, [ecrituresProp]);
+
+  const defaultComptes: CompteComptable[] = [
     {
       numero: '5121',
       intitule: 'Banque',
@@ -130,6 +177,51 @@ export default function JournalModule() {
     }
   ];
 
+  const normalizeStatut = (val: any): EcritureComptable['statut'] => {
+    switch (String(val || '').toUpperCase()) {
+      case 'VALIDEE':
+      case 'VALIDÉE':
+      case 'VALIDE':
+        return 'Validée';
+      case 'BROUILLON':
+      case 'EN ATTENTE':
+        return 'En attente';
+      case 'REJETEE':
+      case 'REJETÉE':
+        return 'Rejetée';
+      default:
+        return 'Validée';
+    }
+  };
+
+  const ecritures: EcritureComptable[] = useMemo(() => {
+    if (!ecrituresProp || ecrituresProp.length === 0) return defaultEcritures;
+    return ecrituresProp.map((e: any, idx: number) => ({
+      id: String(e.id ?? idx + 1),
+      date: String(e.date ?? e.date_ecriture ?? ''),
+      numeroEcriture: String(e.numeroEcriture ?? e.numero ?? ''),
+      libelle: String(e.libelle ?? ''),
+      compteDebit: String(e.compteDebit ?? ''),
+      compteCredit: String(e.compteCredit ?? ''),
+      montant: Number(e.montant ?? e.montant_total ?? 0),
+      reference: String(e.reference ?? ''),
+      entite: String(e.entite ?? ''),
+      statut: normalizeStatut(e.statut),
+    }));
+  }, [ecrituresProp]);
+
+  const comptes: CompteComptable[] = useMemo(() => {
+    if (!comptesProp || comptesProp.length === 0) return defaultComptes;
+    return comptesProp.map((c: any, idx: number) => ({
+      numero: String(c.numero ?? c.compte_numero ?? idx + 1),
+      intitule: String(c.intitule ?? c.compte_libelle ?? ''),
+      type: (String(c.type ?? 'Actif') as any),
+      soldeDebiteur: Number(c.soldeDebiteur ?? c.solde_debiteur ?? 0),
+      soldeCrediteur: Number(c.soldeCrediteur ?? c.solde_crediteur ?? 0),
+      solde: Number(c.solde ?? 0),
+    }));
+  }, [comptesProp]);
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-CD', {
       style: 'currency',
@@ -167,6 +259,81 @@ export default function JournalModule() {
     );
   };
 
+  const computeJournalCode = (e: EcritureComptable): string => {
+    // Si backend fournit e.journal, l'utiliser; sinon heuristique simple
+    const lib = (e.libelle || '').toLowerCase();
+    if (lib.includes('achat')) return 'ACH';
+    if (lib.includes('vente')) return 'VEN';
+    if (lib.includes('paiement') || lib.includes('banque')) return 'BNQ';
+    if (lib.includes('od ') || lib.includes('opération diverses')) return 'OD';
+    return 'GNRL';
+  };
+
+  const parseISO = (s: string) => (s ? new Date(s) : null);
+
+  const journalFiltered: EcritureComptable[] = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    const df = parseISO(dateFrom);
+    const dt = parseISO(dateTo);
+    return ecritures.filter(e => {
+      const txt = `${e.date} ${e.numeroEcriture} ${e.libelle} ${e.reference} ${e.entite}`.toLowerCase();
+      if (q && !txt.includes(q)) return false;
+      if (filterEntite && String(e.entite) !== filterEntite) return false;
+      if (filterStatut && e.statut !== filterStatut) return false;
+      if (filterJournal) {
+        const code = computeJournalCode(e);
+        if (code !== filterJournal) return false;
+      }
+      if (df) {
+        const ed = new Date(e.date);
+        if (isFinite(ed.getTime()) && ed < df) return false;
+      }
+      if (dt) {
+        const ed = new Date(e.date);
+        if (isFinite(ed.getTime()) && ed > dt) return false;
+      }
+      return true;
+    });
+  }, [ecritures, searchTerm, filterEntite, filterStatut, filterJournal, dateFrom, dateTo]);
+
+  const handleExport = () => {
+    if (activeTab === 'journal') {
+      const rows = journalFiltered.map(e => ({
+        Date: e.date,
+        Journal: computeJournalCode(e),
+        NumeroPiece: e.numeroEcriture,
+        Reference: e.reference,
+        Libelle: e.libelle,
+        CompteDebit: e.compteDebit,
+        CompteCredit: e.compteCredit,
+        Montant: formatCurrency(e.montant),
+        Entite: e.entite,
+        Statut: e.statut,
+      }));
+      return exportToExcel(rows, generateFilename(`journal_${selectedPeriod}`));
+    }
+    if (activeTab === 'grand-livre') {
+      const rows = comptes.map(c => ({
+        Compte: c.numero,
+        Intitule: c.intitule,
+        Type: c.type,
+        SoldeDebiteur: c.soldeDebiteur ? formatCurrency(c.soldeDebiteur) : '-',
+        SoldeCrediteur: c.soldeCrediteur ? formatCurrency(c.soldeCrediteur) : '-',
+        Solde: formatCurrency(c.solde),
+      }));
+      return exportToExcel(rows, generateFilename(`grand_livre_${selectedPeriod}`));
+    }
+    if (activeTab === 'balance') {
+      const rows = comptes.map(c => ({
+        Compte: c.numero,
+        Intitule: c.intitule,
+        Type: c.type,
+        Solde: formatCurrency(c.solde),
+      }));
+      return exportToExcel(rows, generateFilename(`balance_${selectedPeriod}`));
+    }
+  };
+
   const totalDebit = ecritures.filter(e => e.statut === 'Validée').reduce((sum, e) => sum + e.montant, 0);
   const totalCredit = totalDebit; // En comptabilité, débit = crédit
   const nombreEcritures = ecritures.filter(e => e.statut === 'Validée').length;
@@ -179,16 +346,26 @@ export default function JournalModule() {
           <p className="text-gray-600">Suivi des opérations comptables : journal, grand livre, balance</p>
         </div>
         <div className="flex items-center space-x-4">
+          <button
+            onClick={onCreateRequested}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+            title="Créer une écriture (ouvre la saisie)"
+            aria-label="Créer une écriture"
+          >
+            <span>Créer une écriture</span>
+          </button>
           <select
             value={selectedPeriod}
             onChange={(e) => setSelectedPeriod(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            title="Sélectionner la période"
+            aria-label="Sélectionner la période comptable"
           >
             <option value="Janvier 2024">Janvier 2024</option>
             <option value="Décembre 2023">Décembre 2023</option>
             <option value="Novembre 2023">Novembre 2023</option>
           </select>
-          <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2">
+          <button onClick={handleExport} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2" title="Exporter les données de l'onglet courant" aria-label="Exporter">
             <Download className="h-4 w-4" />
             <span>Exporter</span>
           </button>
@@ -292,21 +469,101 @@ export default function JournalModule() {
           {activeTab === 'journal' && (
             <div className="space-y-4">
               {/* Filtres */}
-              <div className="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-4">
-                <div className="flex-1 relative">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="col-span-1 md:col-span-2 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
+                    id="journal-search"
                     type="text"
-                    placeholder="Rechercher une écriture..."
+                    placeholder="Référence, numéro, libellé, entité..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    title="Recherche plein texte"
+                    aria-label="Recherche plein texte"
                   />
                 </div>
-                
-                <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2">
-                  <Filter className="h-4 w-4" />
-                  <span>Filtres</span>
+                <div>
+                  <label htmlFor="journal-code" className="block text-xs font-medium text-gray-600 mb-1">Journal</label>
+                  <select
+                    id="journal-code"
+                    value={filterJournal}
+                    onChange={(e) => setFilterJournal(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    title="Filtrer par journal"
+                  >
+                    <option value="">Tous</option>
+                    <option value="GNRL">Général</option>
+                    <option value="ACH">Achat</option>
+                    <option value="VEN">Vente</option>
+                    <option value="BNQ">Banque</option>
+                    <option value="OD">OD</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="journal-entite" className="block text-xs font-medium text-gray-600 mb-1">Entité</label>
+                  <select
+                    id="journal-entite"
+                    value={filterEntite}
+                    onChange={(e) => setFilterEntite(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    title="Filtrer par entité"
+                  >
+                    <option value="">Toutes</option>
+                    {entiteOptions.map(ent => (
+                      <option key={ent} value={ent}>{ent}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="journal-statut" className="block text-xs font-medium text-gray-600 mb-1">Statut</label>
+                  <select
+                    id="journal-statut"
+                    value={filterStatut}
+                    onChange={(e) => setFilterStatut(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    title="Filtrer par statut"
+                  >
+                    <option value="">Tous</option>
+                    <option value="Validée">Validée</option>
+                    <option value="En attente">En attente</option>
+                    <option value="Rejetée">Rejetée</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label htmlFor="date-from" className="block text-xs font-medium text-gray-600 mb-1">Du</label>
+                    <input
+                      id="date-from"
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      title="Date de début"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="date-to" className="block text-xs font-medium text-gray-600 mb-1">Au</label>
+                    <input
+                      id="date-to"
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      title="Date de fin"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end mt-3">
+                <button
+                  type="button"
+                  onClick={() => { setFilterJournal(''); setFilterEntite(''); setFilterStatut(''); setDateFrom(''); setDateTo(''); setSearchTerm(''); }}
+                  className="inline-flex items-center px-3 py-2 text-sm border rounded-lg text-gray-700 bg-white hover:bg-gray-50"
+                  title="Réinitialiser les filtres"
+                >
+                  <Filter className="h-4 w-4 mr-2" /> Réinitialiser
                 </button>
               </div>
 
@@ -336,7 +593,7 @@ export default function JournalModule() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {ecritures.map((ecriture) => (
+                    {journalFiltered.map((ecriture: EcritureComptable) => (
                       <tr key={ecriture.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div>

@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { CompteResultat } from '../types/finance';
+import type { CompteResultat } from '../types/finance';
 
 export const useCompteResultat = (exerciceId: string) => {
   const [resultat, setResultat] = useState<CompteResultat[]>([]);
@@ -13,7 +12,7 @@ export const useCompteResultat = (exerciceId: string) => {
       .select('*')
       .eq('exercice_id', exerciceId)
       .order('ordre')
-      .then(({ data, error }) => {
+      .then(({ data, error }: { data: any; error: any }) => {
         if (error) console.error(error);
         setResultat(data || []);
         setLoading(false);

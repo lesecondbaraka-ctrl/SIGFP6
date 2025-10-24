@@ -94,8 +94,7 @@ export async function getUserPermissions(roleName: string): Promise<Permission[]
       .single();
 
     if (roleError || !roleData) {
-      console.warn(`Rôle ${roleName} non trouvé`);
-      return [];
+            return [];
     }
 
     // Récupérer les permissions du rôle

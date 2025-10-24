@@ -70,6 +70,8 @@ export default function AlertsPanel({ alerts, onDismiss }: AlertsPanelProps) {
                   <button
                     onClick={() => onDismiss(alert.id)}
                     className="ml-3 p-1 hover:bg-gray-200 rounded-full transition-colors"
+                    aria-label="Fermer l'alerte"
+                    title="Fermer l'alerte"
                   >
                     <X className="h-4 w-4 text-gray-500" />
                   </button>

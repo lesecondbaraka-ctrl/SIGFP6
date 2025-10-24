@@ -247,6 +247,8 @@ export default function ArchivageModule() {
                   value={selectedType}
                   onChange={(e) => setSelectedType(e.target.value)}
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  aria-label="Filtrer par type"
+                  title="Sélectionner un type"
                 >
                   <option value="Tous">Tous les types</option>
                   <option value="Budget">Budget</option>
@@ -260,6 +262,8 @@ export default function ArchivageModule() {
                   value={selectedConfidentialite}
                   onChange={(e) => setSelectedConfidentialite(e.target.value)}
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  aria-label="Filtrer par confidentialité"
+                  title="Sélectionner une confidentialité"
                 >
                   <option value="Tous">Toutes confidentialités</option>
                   <option value="Public">Public</option>
@@ -328,10 +332,10 @@ export default function ArchivageModule() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex items-center space-x-2">
-                            <button className="text-blue-600 hover:text-blue-900">
+                            <button className="text-blue-600 hover:text-blue-900" aria-label="Prévisualiser le document" title="Prévisualiser le document">
                               <Eye className="h-4 w-4" />
                             </button>
-                            <button className="text-green-600 hover:text-green-900">
+                            <button className="text-green-600 hover:text-green-900" aria-label="Télécharger le document" title="Télécharger le document">
                               <Download className="h-4 w-4" />
                             </button>
                           </div>

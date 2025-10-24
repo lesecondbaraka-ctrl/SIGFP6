@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { FluxTresorerie } from '../types/finance';
+import type { FluxTresorerie } from '../types/finance';
 
 export const useFluxTresorerie = (exerciceId: string) => {
   const [flux, setFlux] = useState<FluxTresorerie[]>([]);
@@ -12,7 +12,7 @@ export const useFluxTresorerie = (exerciceId: string) => {
       .select('*')
       .eq('exercice_id', exerciceId)
       .order('ordre')
-      .then(({ data, error }) => {
+      .then(({ data, error }: { data: any; error: any }) => {
         if (error) console.error(error);
         setFlux(data || []);
         setLoading(false);

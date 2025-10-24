@@ -1,0 +1,444 @@
+/**
+ * SIGFP 5 - Styles Responsive Globaux
+ * Optimisation pour mobile, tablette et desktop
+ */
+
+/* ============================================================================
+   BREAKPOINTS STANDARDS
+   ============================================================================ */
+/* 
+  - Mobile:  < 640px (sm)
+  - Tablet:  640px - 1024px (md - lg)
+  - Desktop: > 1024px (lg+)
+*/
+
+/* ============================================================================
+   CORRECTIONS GLOBALES POUR TABLEAUX
+   ============================================================================ */
+
+/* Tableaux responsive avec scroll horizontal sur mobile */
+@media (max-width: 768px) {
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  /* Tables responsive */
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  table thead {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+  }
+  
+  table tbody {
+    display: table;
+    width: 100%;
+  }
+
+  /* Réduire padding des cellules sur mobile */
+  table th,
+  table td {
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.875rem;
+  }
+}
+
+/* ============================================================================
+   GRIDS RESPONSIVE
+   ============================================================================ */
+
+/* Force 1 colonne sur mobile pour tous les grids */
+@media (max-width: 640px) {
+  .grid.grid-cols-2,
+  .grid.grid-cols-3,
+  .grid.grid-cols-4,
+  .grid.grid-cols-5,
+  .grid.grid-cols-6 {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+  
+  /* Colonnes span */
+  .col-span-2,
+  .col-span-3,
+  .col-span-4,
+  .col-span-5,
+  .col-span-6 {
+    grid-column: span 1 / span 1 !important;
+  }
+}
+
+/* 2 colonnes sur tablette */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .grid.grid-cols-3,
+  .grid.grid-cols-4,
+  .grid.grid-cols-5,
+  .grid.grid-cols-6 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+/* ============================================================================
+   NAVIGATION & ONGLETS
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  /* Navigation horizontale scrollable */
+  nav {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  
+  nav::-webkit-scrollbar {
+    height: 4px;
+  }
+  
+  nav::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+
+  /* Boutons d'onglets plus petits */
+  nav button {
+    padding: 0.75rem 1rem !important;
+    font-size: 0.875rem !important;
+    white-space: nowrap;
+  }
+  
+  nav button span {
+    display: inline !important;
+  }
+}
+
+/* ============================================================================
+   BOUTONS & ACTIONS
+   ============================================================================ */
+
+@media (max-width: 640px) {
+  /* Stack buttons verticalement sur mobile */
+  .flex.space-x-3,
+  .flex.space-x-4 {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+  }
+  
+  .flex.space-x-3 > *,
+  .flex.space-x-4 > * {
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  /* Boutons full width sur mobile */
+  button {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  /* Exception pour les boutons d'actions dans les tables */
+  table button {
+    width: auto !important;
+  }
+}
+
+/* ============================================================================
+   MODALS
+   ============================================================================ */
+
+@media (max-width: 640px) {
+  /* Modals full screen sur mobile */
+  .fixed.inset-0 > div {
+    margin: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+  }
+  
+  /* Scroll dans les modals */
+  .fixed.inset-0 > div > div {
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+  }
+}
+
+/* ============================================================================
+   FORMULAIRES
+   ============================================================================ */
+
+@media (max-width: 640px) {
+  /* Champs de formulaire full width */
+  input,
+  select,
+  textarea {
+    width: 100% !important;
+  }
+  
+  /* Labels au-dessus des inputs */
+  label {
+    display: block !important;
+    margin-bottom: 0.5rem !important;
+  }
+  
+  /* Grid de formulaires en 1 colonne */
+  form .grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+}
+
+/* ============================================================================
+   EN-TÊTES & TITRES
+   ============================================================================ */
+
+@media (max-width: 640px) {
+  /* Titres plus petits */
+  h1 {
+    font-size: 1.5rem !important;
+  }
+  
+  h2 {
+    font-size: 1.25rem !important;
+  }
+  
+  h3 {
+    font-size: 1.125rem !important;
+  }
+  
+  /* En-tête avec actions stack */
+  .flex.items-center.justify-between {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 1rem !important;
+  }
+  
+  .flex.items-center.justify-between > div {
+    width: 100% !important;
+  }
+}
+
+/* ============================================================================
+   CARDS & CONTAINERS
+   ============================================================================ */
+
+@media (max-width: 640px) {
+  /* Padding réduit sur mobile */
+  .p-6 {
+    padding: 1rem !important;
+  }
+  
+  .px-6 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+  
+  .py-6 {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+  }
+  
+  /* Espacements réduits */
+  .space-y-6 > * + * {
+    margin-top: 1rem !important;
+  }
+  
+  .gap-4 {
+    gap: 0.75rem !important;
+  }
+}
+
+/* ============================================================================
+   STATISTIQUES & KPIs
+   ============================================================================ */
+
+@media (max-width: 640px) {
+  /* KPI cards plus compactes */
+  .bg-gradient-to-br {
+    padding: 1rem !important;
+  }
+  
+  /* Textes de KPIs ajustés */
+  .text-2xl {
+    font-size: 1.5rem !important;
+  }
+  
+  .text-xl {
+    font-size: 1.125rem !important;
+  }
+}
+
+/* ============================================================================
+   ICÔNES
+   ============================================================================ */
+
+@media (max-width: 640px) {
+  /* Icônes plus petites sur mobile */
+  svg.h-8,
+  svg.h-10 {
+    height: 1.5rem !important;
+    width: 1.5rem !important;
+  }
+  
+  svg.h-6 {
+    height: 1.25rem !important;
+    width: 1.25rem !important;
+  }
+}
+
+/* ============================================================================
+   FILTRES & RECHERCHE
+   ============================================================================ */
+
+@media (max-width: 640px) {
+  /* Barre de recherche full width */
+  .flex-1.relative {
+    flex: none !important;
+    width: 100% !important;
+  }
+  
+  /* Selects full width */
+  .flex.items-center > select {
+    width: 100% !important;
+  }
+}
+
+/* ============================================================================
+   SCROLLBAR PERSONNALISÉE (webkit)
+   ============================================================================ */
+
+/* Scrollbar fine pour tableaux */
+.overflow-x-auto::-webkit-scrollbar {
+  height: 8px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* ============================================================================
+   UTILITAIRES RESPONSIVE
+   ============================================================================ */
+
+/* Masquer sur mobile */
+.mobile-hidden {
+  display: none !important;
+}
+
+@media (min-width: 768px) {
+  .mobile-hidden {
+    display: block !important;
+  }
+}
+
+/* Afficher seulement sur mobile */
+.mobile-only {
+  display: block !important;
+}
+
+@media (min-width: 768px) {
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+/* Texte responsive */
+.text-responsive {
+  font-size: 0.875rem;
+}
+
+@media (min-width: 768px) {
+  .text-responsive {
+    font-size: 1rem;
+  }
+}
+
+/* ============================================================================
+   ANIMATIONS MOBILE-FRIENDLY
+   ============================================================================ */
+
+/* Réduire animations sur petits écrans */
+@media (max-width: 640px) {
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ============================================================================
+   FIX POUR LANDSCAPE MODE (mobile horizontal)
+   ============================================================================ */
+
+@media (max-height: 500px) and (orientation: landscape) {
+  /* Réduire encore plus les paddings */
+  .p-6,
+  .py-6 {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+  
+  /* Titres plus petits */
+  h1,
+  h2 {
+    font-size: 1rem !important;
+  }
+}
+
+/* ============================================================================
+   AMÉLIORATION TOUCH
+   ============================================================================ */
+
+/* Zones tactiles plus grandes */
+@media (max-width: 640px) {
+  button,
+  a,
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ============================================================================
+   IMPRESSION (BONUS)
+   ============================================================================ */
+
+@media print {
+  /* Masquer éléments non nécessaires à l'impression */
+  button,
+  nav,
+  .mobile-only,
+  .mobile-hidden {
+    display: none !important;
+  }
+  
+  /* Ajuster les couleurs pour l'impression */
+  * {
+    color: #000 !important;
+    background: #fff !important;
+  }
+  
+  /* Tableaux full width */
+  table {
+    width: 100% !important;
+  }
+}

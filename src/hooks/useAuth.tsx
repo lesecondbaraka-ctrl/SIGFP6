@@ -29,8 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       savedUser = localStorage.getItem('sigfp_user');
     } catch (err) {
-      console.warn('AuthProvider: localStorage not available', err);
-    }
+          }
     if (savedUser) {
       try {
         const user = JSON.parse(savedUser);
@@ -55,8 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         userNotifications = await getUserNotifications(user.id_utilisateur);
       } catch (error) {
-        console.warn('Impossible de charger les notifications:', error);
-      }
+              }
       
       setAuthState({
         user,
@@ -101,8 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           await signOut(authState.user.id_utilisateur);
         } catch (error) {
-          console.warn('Erreur lors de la déconnexion:', error);
-        }
+                  }
       }
       localStorage.removeItem('sigfp_user');
       setAuthState({
@@ -133,8 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userNotifications = await getUserNotifications(authState.user.id_utilisateur);
         setNotifications(userNotifications);
       } catch (error) {
-        console.warn('Impossible de rafraîchir les notifications:', error);
-      }
+              }
     }
   };
 

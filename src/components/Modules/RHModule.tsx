@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Users, Plus, Search, Filter, Download, Eye, Edit, Calculator } from 'lucide-react';
+import { useState } from 'react';
+import { Users, Search, Download, Eye, Edit, Calculator, FileText, X, AlertTriangle } from 'lucide-react';
+import { exportToExcel, generateFilename } from '../../utils/exportUtils';
 
 interface Agent {
   id: string;
@@ -8,31 +9,127 @@ interface Agent {
   prenom: string;
   poste: string;
   grade: string;
-  salaire: number;
+  salaireBrut: number;
   primes: number;
-  retenues: number;
+  salaireImposable: number;
+  ipr: number; // Impôt Professionnel sur les Rémunérations
+  inss: number; // Institut National de Sécurité Sociale
+  autresRetenues: number;
   salaireNet: number;
   entite: string;
   statut: 'Actif' | 'Inactif' | 'Suspendu';
+  numeroINSS: string;
+  numeroImpot: string;
 }
 
-interface Paie {
+interface DeclarationFiscale {
   id: string;
   periode: string;
+  type: 'IPR' | 'INSS' | 'Mensuelle';
+  montantTotal: number;
   nombreAgents: number;
-  montantBrut: number;
-  montantRetenues: number;
-  montantNet: number;
-  statut: 'Calculée' | 'Validée' | 'Payée';
-  dateCalcul: string;
+  dateEcheance: string;
+  statut: 'Brouillon' | 'Soumise' | 'Validée' | 'Payée';
 }
 
 export default function RHModule() {
   const [activeTab, setActiveTab] = useState('agents');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEntite, setSelectedEntite] = useState('Toutes');
+  
+  // États pour les modals
+  const [showGenererPaieModal, setShowGenererPaieModal] = useState(false);
+  const [showAgentDetailModal, setShowAgentDetailModal] = useState(false);
+  const [showAgentEditModal, setShowAgentEditModal] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [showNewDeclarationModal, setShowNewDeclarationModal] = useState(false);
+  const [showDeclarationDetailModal, setShowDeclarationDetailModal] = useState(false);
+  const [selectedDeclaration, setSelectedDeclaration] = useState<DeclarationFiscale | null>(null);
+  
+  // Handlers
+  const handleAgentView = (agent: Agent) => {
+    setSelectedAgent(agent);
+    setShowAgentDetailModal(true);
+  };
+  const handleAgentEdit = (agent: Agent) => {
+    setSelectedAgent(agent);
+    setShowAgentEditModal(true);
+  };
+  const handleExportAgents = () => {
+    const data = agents.map(a => ({
+      Matricule: a.matricule,
+      Nom: `${a.prenom} ${a.nom}`,
+      Poste: a.poste,
+      Grade: a.grade,
+      SalaireBrut: a.salaireBrut,
+      Primes: a.primes,
+      IPR: a.ipr,
+      INSS: a.inss,
+      SalaireNet: a.salaireNet,
+      Entite: a.entite,
+      Statut: a.statut,
+    }));
+    exportToExcel(data, generateFilename('agents_export'));
+  };
+  const handleDeclarationView = (decl: DeclarationFiscale) => {
+    setSelectedDeclaration(decl);
+    setShowDeclarationDetailModal(true);
+  };
+  const handleDeclarationDownload = (decl: DeclarationFiscale) => {
+    const rows = [{
+      Periode: decl.periode,
+      Type: decl.type,
+      NombreAgents: decl.nombreAgents,
+      MontantTotal: decl.montantTotal,
+      Echeance: decl.dateEcheance,
+      Statut: decl.statut,
+    }];
+    exportToExcel(rows, generateFilename(`declaration_${decl.type}_${decl.periode}`));
+  };
 
-  const agents: Agent[] = [
+
+  // Barèmes fiscaux RDC 2024
+  const baremeIPR = [
+    { min: 0, max: 524160, taux: 0 }, // Exonération jusqu'à 524,160 CDF
+    { min: 524160, max: 1310400, taux: 15 },
+    { min: 1310400, max: 2620800, taux: 20 },
+    { min: 2620800, max: 5241600, taux: 30 },
+    { min: 5241600, max: Infinity, taux: 40 }
+  ];
+  const tauxINSS = 0.065; // 6.5% pour l'employé + 6.5% pour l'employeur
+
+  const calculerIPR = (salaireImposable: number): number => {
+    let ipr = 0;
+    let resteAImposer = salaireImposable;
+
+    for (const tranche of baremeIPR) {
+      if (resteAImposer <= 0) break;
+      
+      const baseImposable = Math.min(resteAImposer, tranche.max - tranche.min);
+      ipr += baseImposable * (tranche.taux / 100);
+      resteAImposer -= baseImposable;
+    }
+
+    return Math.round(ipr);
+  };
+
+  const calculerINSS = (salaireBrut: number): number => {
+    // Plafond INSS: 262,080 CDF (2024)
+    const plafondINSS = 262080;
+    const baseINSS = Math.min(salaireBrut, plafondINSS);
+    return Math.round(baseINSS * tauxINSS);
+  };
+
+  // Fonction de calcul de salaire (utilisée pour les calculs automatiques)
+  // const calculerSalaire = (salaireBrut: number, primes: number): number => {
+  //   const salaireImposable = salaireBrut + primes;
+  //   const ipr = calculerIPR(salaireImposable);
+  //   const inss = calculerINSS(salaireBrut);
+  //   const salaireNet = salaireImposable - ipr - inss;
+  //   return salaireNet;
+  // };
+
+  const initialAgents: Agent[] = [
     {
       id: '1',
       matricule: 'AGT-001',
@@ -40,12 +137,17 @@ export default function RHModule() {
       prenom: 'Jean-Pierre',
       poste: 'Directeur Financier',
       grade: 'A1',
-      salaire: 2500000,
+      salaireBrut: 2500000,
       primes: 500000,
-      retenues: 450000,
-      salaireNet: 2550000,
+      salaireImposable: 3000000,
+      ipr: calculerIPR(3000000),
+      inss: calculerINSS(2500000),
+      autresRetenues: 50000,
+      salaireNet: 0, // Calculé ci-dessous
       entite: 'MIN-BUDGET',
-      statut: 'Actif'
+      statut: 'Actif',
+      numeroINSS: 'INSS-001-2024',
+      numeroImpot: 'IMP-001-2024'
     },
     {
       id: '2',
@@ -54,12 +156,17 @@ export default function RHModule() {
       prenom: 'Marie-Claire',
       poste: 'Comptable Principal',
       grade: 'A2',
-      salaire: 1800000,
+      salaireBrut: 1800000,
       primes: 300000,
-      retenues: 315000,
-      salaireNet: 1785000,
+      salaireImposable: 2100000,
+      ipr: calculerIPR(2100000),
+      inss: calculerINSS(1800000),
+      autresRetenues: 25000,
+      salaireNet: 0,
       entite: 'MIN-SANTE',
-      statut: 'Actif'
+      statut: 'Actif',
+      numeroINSS: 'INSS-002-2024',
+      numeroImpot: 'IMP-002-2024'
     },
     {
       id: '3',
@@ -68,12 +175,17 @@ export default function RHModule() {
       prenom: 'Paul',
       poste: 'Contrôleur de Gestion',
       grade: 'B1',
-      salaire: 1500000,
+      salaireBrut: 1500000,
       primes: 200000,
-      retenues: 255000,
-      salaireNet: 1445000,
+      salaireImposable: 1700000,
+      ipr: calculerIPR(1700000),
+      inss: calculerINSS(1500000),
+      autresRetenues: 15000,
+      salaireNet: 0,
       entite: 'MIN-EDUC',
-      statut: 'Actif'
+      statut: 'Actif',
+      numeroINSS: 'INSS-003-2024',
+      numeroImpot: 'IMP-003-2024'
     },
     {
       id: '4',
@@ -82,47 +194,57 @@ export default function RHModule() {
       prenom: 'Françoise',
       poste: 'Secrétaire Administrative',
       grade: 'C1',
-      salaire: 800000,
+      salaireBrut: 800000,
       primes: 100000,
-      retenues: 135000,
-      salaireNet: 765000,
+      salaireImposable: 900000,
+      ipr: calculerIPR(900000),
+      inss: calculerINSS(800000),
+      autresRetenues: 10000,
+      salaireNet: 0,
       entite: 'MIN-INFRA',
-      statut: 'Suspendu'
+      statut: 'Suspendu',
+      numeroINSS: 'INSS-004-2024',
+      numeroImpot: 'IMP-004-2024'
     }
   ];
+  const [agents, setAgents] = useState(initialAgents);
 
-  const paies: Paie[] = [
+  // Calculer les salaires nets
+  agents.forEach(agent => {
+    agent.salaireNet = agent.salaireImposable - agent.ipr - agent.inss - agent.autresRetenues;
+  });
+
+  const initialDeclarations: DeclarationFiscale[] = [
     {
       id: '1',
       periode: 'Janvier 2024',
-      nombreAgents: 1247,
-      montantBrut: 1850000000,
-      montantRetenues: 277500000,
-      montantNet: 1572500000,
-      statut: 'Payée',
-      dateCalcul: '2024-01-25'
+      type: 'IPR',
+      montantTotal: agents.reduce((sum, a) => sum + a.ipr, 0),
+      nombreAgents: agents.length,
+      dateEcheance: '2024-02-15',
+      statut: 'Payée'
     },
     {
       id: '2',
-      periode: 'Décembre 2023',
-      nombreAgents: 1245,
-      montantBrut: 1820000000,
-      montantRetenues: 273000000,
-      montantNet: 1547000000,
-      statut: 'Payée',
-      dateCalcul: '2023-12-25'
+      periode: 'Janvier 2024',
+      type: 'INSS',
+      montantTotal: agents.reduce((sum, a) => sum + a.inss, 0) * 2, // Employé + Employeur
+      nombreAgents: agents.length,
+      dateEcheance: '2024-02-15',
+      statut: 'Payée'
     },
     {
       id: '3',
       periode: 'Février 2024',
-      nombreAgents: 1250,
-      montantBrut: 1875000000,
-      montantRetenues: 281250000,
-      montantNet: 1593750000,
-      statut: 'Calculée',
-      dateCalcul: '2024-02-20'
+      type: 'IPR',
+      montantTotal: agents.reduce((sum, a) => sum + a.ipr, 0),
+      nombreAgents: agents.length,
+      dateEcheance: '2024-03-15',
+      statut: 'Soumise'
     }
   ];
+
+  const [declarationsFiscales, setDeclarationsFiscales] = useState(initialDeclarations);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-CD', {
@@ -137,7 +259,8 @@ export default function RHModule() {
       'Actif': 'bg-green-100 text-green-800',
       'Inactif': 'bg-gray-100 text-gray-800',
       'Suspendu': 'bg-red-100 text-red-800',
-      'Calculée': 'bg-blue-100 text-blue-800',
+      'Brouillon': 'bg-gray-100 text-gray-800',
+      'Soumise': 'bg-blue-100 text-blue-800',
       'Validée': 'bg-yellow-100 text-yellow-800',
       'Payée': 'bg-green-100 text-green-800'
     };
@@ -153,69 +276,97 @@ export default function RHModule() {
     totalAgents: agents.length,
     agentsActifs: agents.filter(a => a.statut === 'Actif').length,
     masseSalariale: agents.reduce((sum, a) => sum + a.salaireNet, 0),
-    moyenneSalaire: agents.reduce((sum, a) => sum + a.salaireNet, 0) / agents.length
+    totalIPR: agents.reduce((sum, a) => sum + a.ipr, 0),
+    totalINSS: agents.reduce((sum, a) => sum + a.inss, 0),
+    moyenneSalaire: agents.length ? agents.reduce((sum, a) => sum + a.salaireNet, 0) / agents.length : 0,
+    // Champs utilisés dans le résumé de paie
+    masseSalarialeBrute: agents.reduce((sum, a) => sum + a.salaireBrut + a.primes, 0),
+    totalRetenues: agents.reduce((sum, a) => sum + a.ipr + a.inss + a.autresRetenues, 0),
+    masseSalarialeNette: agents.reduce((sum, a) => sum + a.salaireNet, 0),
+  };
+
+  // Helpers for new declaration
+  const computeDeclarationMontant = (type: DeclarationFiscale['type']) => {
+    if (type === 'IPR') return agents.reduce((s, a) => s + a.ipr, 0);
+    if (type === 'INSS') return agents.reduce((s, a) => s + a.inss, 0) * 2; // employé + employeur
+    return agents.reduce((s, a) => s + a.salaireNet, 0);
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Ressources Humaines</h2>
-          <p className="text-gray-600">Gestion des salaires, primes et retenues fiscales</p>
+          <h2 className="text-2xl font-bold text-gray-900">Ressources Humaines - RDC</h2>
+          <p className="text-gray-600">Gestion conforme à la fiscalité congolaise (IPR, INSS)</p>
         </div>
-        <button className="bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center space-x-2">
-          <Plus className="h-4 w-4" />
-          <span>Nouvel Agent</span>
+        <button 
+          onClick={() => setShowGenererPaieModal(true)}
+          className="bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center space-x-2"
+        >
+          <Calculator className="h-4 w-4" />
+          <span>Générer Paie</span>
         </button>
       </div>
 
       {/* Statistiques */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total Agents</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalAgents}</p>
+              <p className="text-xs font-medium text-gray-600">Total Agents</p>
+              <p className="text-xl font-bold text-gray-900">{stats.totalAgents}</p>
             </div>
-            <div className="p-3 bg-blue-100 rounded-full">
-              <Users className="h-6 w-6 text-blue-600" />
-            </div>
+            <Users className="h-5 w-5 text-blue-600" />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-green-200">
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-green-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Agents Actifs</p>
-              <p className="text-2xl font-bold text-green-600">{stats.agentsActifs}</p>
+              <p className="text-xs font-medium text-gray-600">Agents Actifs</p>
+              <p className="text-xl font-bold text-green-600">{stats.agentsActifs}</p>
             </div>
-            <div className="p-3 bg-green-100 rounded-full">
-              <Users className="h-6 w-6 text-green-600" />
-            </div>
+            <Users className="h-5 w-5 text-green-600" />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-purple-200">
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-purple-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Masse Salariale</p>
-              <p className="text-lg font-bold text-purple-600">{formatCurrency(stats.masseSalariale)}</p>
+              <p className="text-xs font-medium text-gray-600">Masse Salariale</p>
+              <p className="text-sm font-bold text-purple-600">{formatCurrency(stats.masseSalariale)}</p>
             </div>
-            <div className="p-3 bg-purple-100 rounded-full">
-              <Calculator className="h-6 w-6 text-purple-600" />
-            </div>
+            <Calculator className="h-5 w-5 text-purple-600" />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-yellow-200">
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-red-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Salaire Moyen</p>
-              <p className="text-lg font-bold text-yellow-600">{formatCurrency(stats.moyenneSalaire)}</p>
+              <p className="text-xs font-medium text-gray-600">Total IPR</p>
+              <p className="text-sm font-bold text-red-600">{formatCurrency(stats.totalIPR)}</p>
             </div>
-            <div className="p-3 bg-yellow-100 rounded-full">
-              <Calculator className="h-6 w-6 text-yellow-600" />
+            <FileText className="h-5 w-5 text-red-600" />
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-orange-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-gray-600">Total INSS</p>
+              <p className="text-sm font-bold text-orange-600">{formatCurrency(stats.totalINSS)}</p>
             </div>
+            <FileText className="h-5 w-5 text-orange-600" />
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-yellow-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-gray-600">Salaire Moyen</p>
+              <p className="text-sm font-bold text-yellow-600">{formatCurrency(stats.moyenneSalaire)}</p>
+            </div>
+            <Calculator className="h-5 w-5 text-yellow-600" />
           </div>
         </div>
       </div>
@@ -236,15 +387,15 @@ export default function RHModule() {
               <span>Agents</span>
             </button>
             <button
-              onClick={() => setActiveTab('paie')}
+              onClick={() => setActiveTab('fiscalite')}
               className={`py-4 px-6 text-sm font-medium flex items-center space-x-2 ${
-                activeTab === 'paie'
+                activeTab === 'fiscalite'
                   ? 'border-b-2 border-blue-600 text-blue-600'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              <Calculator className="h-4 w-4" />
-              <span>Gestion de la Paie</span>
+              <FileText className="h-4 w-4" />
+              <span>Déclarations Fiscales</span>
             </button>
           </nav>
         </div>
@@ -269,6 +420,8 @@ export default function RHModule() {
                   value={selectedEntite}
                   onChange={(e) => setSelectedEntite(e.target.value)}
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  aria-label="Filtrer par entité"
+                  title="Sélectionner une entité"
                 >
                   <option value="Toutes">Toutes les entités</option>
                   <option value="MIN-BUDGET">MIN-BUDGET</option>
@@ -277,39 +430,42 @@ export default function RHModule() {
                   <option value="MIN-INFRA">MIN-INFRA</option>
                 </select>
 
-                <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2">
+                <button onClick={handleExportAgents} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2" title="Exporter les agents" aria-label="Exporter les agents">
                   <Download className="h-4 w-4" />
                   <span>Exporter</span>
                 </button>
               </div>
 
-              {/* Tableau des agents */}
+              {/* Tableau des agents avec calculs fiscaux */}
               <div className="overflow-x-auto">
-                <table className="w-full divide-y divide-gray-200">
+                <table className="w-full divide-y divide-gray-200 text-sm">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Agent
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Poste/Grade
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Salaire Brut
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Primes
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Retenues
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        IPR (15-40%)
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        INSS (6.5%)
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Salaire Net
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Statut
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -317,40 +473,53 @@ export default function RHModule() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {agents.map((agent) => (
                       <tr key={agent.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <div>
                             <div className="text-sm font-medium text-gray-900">
                               {agent.prenom} {agent.nom}
                             </div>
-                            <div className="text-sm text-gray-500">{agent.matricule}</div>
+                            <div className="text-xs text-gray-500">{agent.matricule}</div>
                             <div className="text-xs text-gray-400">{agent.entite}</div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">{agent.poste}</div>
-                          <div className="text-sm text-gray-500">Grade {agent.grade}</div>
+                          <div className="text-xs text-gray-500">Grade {agent.grade}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {formatCurrency(agent.salaire)}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {formatCurrency(agent.salaireBrut)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600">
                           {formatCurrency(agent.primes)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
-                          {formatCurrency(agent.retenues)}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-red-600">
+                          {formatCurrency(agent.ipr)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-orange-600">
+                          {formatCurrency(agent.inss)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                           {formatCurrency(agent.salaireNet)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           {getStatusBadge(agent.statut)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex items-center space-x-2">
-                            <button className="text-blue-600 hover:text-blue-900">
+                            <button 
+                              onClick={() => handleAgentView(agent)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Voir les détails"
+                              aria-label="Voir les détails de l'agent"
+                            >
                               <Eye className="h-4 w-4" />
                             </button>
-                            <button className="text-indigo-600 hover:text-indigo-900">
+                            <button 
+                              onClick={() => handleAgentEdit(agent)}
+                              className="text-indigo-600 hover:text-indigo-900"
+                              title="Modifier"
+                              aria-label="Modifier l'agent"
+                            >
                               <Edit className="h-4 w-4" />
                             </button>
                           </div>
@@ -363,14 +532,30 @@ export default function RHModule() {
             </div>
           )}
 
-          {activeTab === 'paie' && (
+          {activeTab === 'fiscalite' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Historique des Paies</h3>
-                <button className="bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center space-x-2">
-                  <Calculator className="h-4 w-4" />
-                  <span>Calculer Nouvelle Paie</span>
+                <h3 className="text-lg font-semibold text-gray-900">Déclarations Fiscales RDC</h3>
+                <button onClick={() => setShowNewDeclarationModal(true)} className="bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center space-x-2" title="Créer une nouvelle déclaration" aria-label="Nouvelle déclaration">
+                  <FileText className="h-4 w-4" />
+                  <span>Nouvelle Déclaration</span>
                 </button>
+              </div>
+
+              {/* Barème IPR */}
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h4 className="font-semibold text-blue-900 mb-2">Barème IPR 2024 (RDC)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-xs">
+                  {baremeIPR.map((tranche, index) => (
+                    <div key={index} className="text-center">
+                      <div className="font-medium text-blue-900">
+                        {tranche.max === Infinity ? `> ${formatCurrency(tranche.min)}` : 
+                         `${formatCurrency(tranche.min)} - ${formatCurrency(tranche.max)}`}
+                      </div>
+                      <div className="text-blue-700">{tranche.taux}%</div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="overflow-x-auto">
@@ -381,22 +566,19 @@ export default function RHModule() {
                         Période
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Nombre d'Agents
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Montant Brut
+                        Montant Total
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Retenues
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Montant Net
+                        Échéance
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Statut
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
@@ -404,35 +586,46 @@ export default function RHModule() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {paies.map((paie) => (
-                      <tr key={paie.id} className="hover:bg-gray-50">
+                    {declarationsFiscales.map((declaration) => (
+                      <tr key={declaration.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {paie.periode}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {paie.nombreAgents.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {formatCurrency(paie.montantBrut)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
-                          {formatCurrency(paie.montantRetenues)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600">
-                          {formatCurrency(paie.montantNet)}
+                          {declaration.periode}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {getStatusBadge(paie.statut)}
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            declaration.type === 'IPR' ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800'
+                          }`}>
+                            {declaration.type}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {declaration.nombreAgents}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                          {formatCurrency(declaration.montantTotal)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {paie.dateCalcul}
+                          {declaration.dateEcheance}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {getStatusBadge(declaration.statut)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex items-center space-x-2">
-                            <button className="text-blue-600 hover:text-blue-900">
+                            <button 
+                              onClick={() => handleDeclarationView(declaration)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Voir les détails"
+                              aria-label="Voir les détails de la déclaration"
+                            >
                               <Eye className="h-4 w-4" />
                             </button>
-                            <button className="text-green-600 hover:text-green-900">
+                            <button 
+                              onClick={() => handleDeclarationDownload(declaration)}
+                              className="text-green-600 hover:text-green-900"
+                              title="Télécharger"
+                              aria-label="Télécharger la déclaration"
+                            >
                               <Download className="h-4 w-4" />
                             </button>
                           </div>
@@ -442,28 +635,237 @@ export default function RHModule() {
                   </tbody>
                 </table>
               </div>
-
-              <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
-                <h4 className="text-lg font-semibold text-blue-900 mb-4">Calcul de la Prochaine Paie</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-blue-900">1,252</p>
-                    <p className="text-sm text-blue-700">Agents éligibles</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-blue-900">{formatCurrency(1890000000)}</p>
-                    <p className="text-sm text-blue-700">Montant brut estimé</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-blue-900">{formatCurrency(1606500000)}</p>
-                    <p className="text-sm text-blue-700">Montant net estimé</p>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Modal Générer Paie */}
+      {showGenererPaieModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold">Générer la Paie</h3>
+              <button onClick={() => setShowGenererPaieModal(false)} className="text-gray-400 hover:text-gray-600" title="Fermer" aria-label="Fermer le modal">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <form className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Période de Paie</label>
+                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" title="Période" aria-label="Sélectionner la période">
+                  <option>Janvier 2024</option>
+                  <option>Février 2024</option>
+                  <option>Mars 2024</option>
+                  <option>Avril 2024</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Département</label>
+                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" title="Département" aria-label="Sélectionner le département">
+                  <option>Tous les départements</option>
+                  <option>Finance</option>
+                  <option>IT</option>
+                  <option>RH</option>
+                  <option>Administration</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Type de Paie</label>
+                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" title="Type" aria-label="Sélectionner le type">
+                  <option>Paie Mensuelle</option>
+                  <option>Prime</option>
+                  <option>13ème Mois</option>
+                  <option>Heures Supplémentaires</option>
+                </select>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-900 mb-3">Résumé de la Paie</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-blue-700">Nombre d'agents:</span>
+                    <span className="font-medium text-blue-900">{stats.totalAgents}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-blue-700">Masse salariale brute:</span>
+                    <span className="font-medium text-blue-900">{formatCurrency(stats.masseSalarialeBrute)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-blue-700">Total retenues:</span>
+                    <span className="font-medium text-blue-900">{formatCurrency(stats.totalRetenues)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-blue-300 pt-2 mt-2">
+                    <span className="text-blue-700 font-semibold">Masse salariale nette:</span>
+                    <span className="font-bold text-blue-900">{formatCurrency(stats.masseSalarialeNette)}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start space-x-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                <div className="text-sm text-yellow-800">
+                  <p className="font-medium">Attention</p>
+                  <p>La génération de la paie est irréversible. Assurez-vous que toutes les données sont correctes.</p>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button type="button" onClick={() => setShowGenererPaieModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Annuler</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Générer la Paie</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Détails Agent */}
+      {showAgentDetailModal && selectedAgent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold">Détails de l'Agent</h3>
+              <button onClick={() => setShowAgentDetailModal(false)} className="text-gray-400 hover:text-gray-600" title="Fermer" aria-label="Fermer le modal">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div><span className="text-gray-600">Matricule:</span> <span className="font-medium">{selectedAgent.matricule}</span></div>
+              <div><span className="text-gray-600">Nom:</span> <span className="font-medium">{selectedAgent.prenom} {selectedAgent.nom}</span></div>
+              <div><span className="text-gray-600">Poste/Grade:</span> <span className="font-medium">{selectedAgent.poste} • {selectedAgent.grade}</span></div>
+              <div><span className="text-gray-600">Entité:</span> <span className="font-medium">{selectedAgent.entite}</span></div>
+              <div><span className="text-gray-600">Salaire Brut:</span> <span className="font-medium">{formatCurrency(selectedAgent.salaireBrut)}</span></div>
+              <div><span className="text-gray-600">Primes:</span> <span className="font-medium">{formatCurrency(selectedAgent.primes)}</span></div>
+              <div><span className="text-gray-600">IPR:</span> <span className="font-medium">{formatCurrency(selectedAgent.ipr)}</span></div>
+              <div><span className="text-gray-600">INSS:</span> <span className="font-medium">{formatCurrency(selectedAgent.inss)}</span></div>
+              <div><span className="text-gray-600">Salaire Net:</span> <span className="font-medium">{formatCurrency(selectedAgent.salaireNet)}</span></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Éditer Agent */}
+      {showAgentEditModal && selectedAgent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold">Modifier Agent</h3>
+              <button onClick={() => setShowAgentEditModal(false)} className="text-gray-400 hover:text-gray-600" title="Fermer" aria-label="Fermer le modal">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <form className="space-y-4" onSubmit={(e) => {
+              e.preventDefault();
+              const form = e.currentTarget as HTMLFormElement;
+              const fd = new FormData(form);
+              const updated = { ...selectedAgent } as Agent;
+              updated.salaireBrut = Number(fd.get('salaireBrut'));
+              updated.primes = Number(fd.get('primes'));
+              updated.statut = String(fd.get('statut')) as Agent['statut'];
+              updated.salaireImposable = updated.salaireBrut + updated.primes;
+              updated.ipr = calculerIPR(updated.salaireImposable);
+              updated.inss = calculerINSS(updated.salaireBrut);
+              updated.salaireNet = updated.salaireImposable - updated.ipr - updated.inss - updated.autresRetenues;
+              setAgents(prev => prev.map(a => a.id === updated.id ? updated : a));
+              setShowAgentEditModal(false);
+            }}>
+              <div>
+                <label htmlFor="edit-salaireBrut" className="block text-sm font-medium text-gray-700 mb-1">Salaire Brut</label>
+                <input id="edit-salaireBrut" name="salaireBrut" type="number" defaultValue={selectedAgent.salaireBrut} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label htmlFor="edit-primes" className="block text-sm font-medium text-gray-700 mb-1">Primes</label>
+                <input id="edit-primes" name="primes" type="number" defaultValue={selectedAgent.primes} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label htmlFor="edit-statut" className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
+                <select id="edit-statut" name="statut" defaultValue={selectedAgent.statut} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" aria-label="Sélectionner une option" title="Sélectionner une option">
+                  <option>Actif</option>
+                  <option>Inactif</option>
+                  <option>Suspendu</option>
+                </select>
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button type="button" onClick={() => setShowAgentEditModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Annuler</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Sauvegarder</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nouvelle Déclaration */}
+      {showNewDeclarationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold">Nouvelle Déclaration</h3>
+              <button onClick={() => setShowNewDeclarationModal(false)} className="text-gray-400 hover:text-gray-600" title="Fermer" aria-label="Fermer le modal">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <form className="space-y-4" onSubmit={(e) => {
+              e.preventDefault();
+              const form = e.currentTarget as HTMLFormElement;
+              const fd = new FormData(form);
+              const type = String(fd.get('type')) as DeclarationFiscale['type'];
+              const periode = String(fd.get('periode'));
+              const echeance = String(fd.get('echeance'));
+              const newDecl: DeclarationFiscale = {
+                id: String(Date.now()),
+                periode,
+                type,
+                montantTotal: computeDeclarationMontant(type),
+                nombreAgents: agents.length,
+                dateEcheance: echeance,
+                statut: 'Brouillon',
+              };
+              setDeclarationsFiscales(prev => [newDecl, ...prev]);
+              setShowNewDeclarationModal(false);
+            }}>
+              <div>
+                <label htmlFor="decl-periode" className="block text-sm font-medium text-gray-700 mb-1">Période</label>
+                <input id="decl-periode" name="periode" type="text" placeholder="Ex: Mars 2024" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
+              </div>
+              <div>
+                <label htmlFor="decl-type" className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                <select id="decl-type" name="type" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" defaultValue="IPR" aria-label="Sélectionner une option" title="Sélectionner une option">
+                  <option>IPR</option>
+                  <option>INSS</option>
+                  <option>Mensuelle</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="decl-ech" className="block text-sm font-medium text-gray-700 mb-1">Date d'échéance</label>
+                <input id="decl-ech" name="echeance" type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required />
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button type="button" onClick={() => setShowNewDeclarationModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Annuler</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Créer</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Détails Déclaration */}
+      {showDeclarationDetailModal && selectedDeclaration && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold">Détails de la Déclaration</h3>
+              <button onClick={() => setShowDeclarationDetailModal(false)} className="text-gray-400 hover:text-gray-600" title="Fermer" aria-label="Fermer le modal">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div><span className="text-gray-600">Période:</span> <span className="font-medium">{selectedDeclaration.periode}</span></div>
+              <div><span className="text-gray-600">Type:</span> <span className="font-medium">{selectedDeclaration.type}</span></div>
+              <div><span className="text-gray-600">Nombre d'Agents:</span> <span className="font-medium">{selectedDeclaration.nombreAgents}</span></div>
+              <div><span className="text-gray-600">Montant Total:</span> <span className="font-medium">{formatCurrency(selectedDeclaration.montantTotal)}</span></div>
+              <div><span className="text-gray-600">Échéance:</span> <span className="font-medium">{selectedDeclaration.dateEcheance}</span></div>
+              <div><span className="text-gray-600">Statut:</span> <span className="font-medium">{selectedDeclaration.statut}</span></div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

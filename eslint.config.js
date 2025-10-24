@@ -6,7 +6,7 @@ import tsPlugin from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 
 export default [
-  // top-level ignore globs
+  js.configs.recommended,
   { ignores: ['**/dist/**', 'node_modules/**'] },
   {
     files: ['**/*.{ts,tsx,js,jsx}'],
@@ -14,7 +14,7 @@ export default [
       ecmaVersion: 2020,
       sourceType: 'module',
       globals: globals.browser,
-      parser: { parseForESLint: tsParser.parseForESLint },
+      parser: tsParser,
     },
     plugins: {
       'react-hooks': reactHooks,
@@ -24,7 +24,6 @@ export default [
     linterOptions: {
       reportUnusedDisableDirectives: true,
     },
-    ...js.configs.recommended,
     rules: {
       'react-refresh/only-export-components': [
         'warn',
@@ -32,7 +31,7 @@ export default [
       ],
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
-      ...reactHooks.configs?.recommended?.rules,
+      ...(reactHooks.configs?.recommended?.rules || {}),
     },
   },
 ];

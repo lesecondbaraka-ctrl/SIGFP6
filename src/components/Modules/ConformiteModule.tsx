@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, AlertTriangle, XCircle, CheckCircle, Settings } from 'lucide-react';
+import { Shield, AlertTriangle, XCircle, CheckCircle, Settings, Plus, Edit, Download } from 'lucide-react';
 
 interface RegleConformite {
   id: string;
@@ -24,6 +24,15 @@ interface ViolationConformite {
 export default function ConformiteModule() {
   const [activeTab, setActiveTab] = useState('violations');
   const [selectedType, setSelectedType] = useState('Tous');
+  const [showNewRuleModal, setShowNewRuleModal] = useState(false);
+  const [showEditRuleModal, setShowEditRuleModal] = useState(false);
+  const [selectedRule, setSelectedRule] = useState<RegleConformite | null>(null);
+  const [newRule, setNewRule] = useState({
+    nom: '',
+    description: '',
+    type: 'Budgétaire' as 'Budgétaire' | 'Documentaire' | 'Procédurale' | 'Seuil',
+    severite: 'Bloquant' as 'Bloquant' | 'Avertissement' | 'Information'
+  });
 
   const regles: RegleConformite[] = [
     {
@@ -184,10 +193,19 @@ export default function ConformiteModule() {
           <h2 className="text-2xl font-bold text-gray-900">Filtre de Conformité</h2>
           <p className="text-gray-600">Rejet automatique des dépenses ne respectant pas les procédures établies</p>
         </div>
-        <button className="bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center space-x-2">
-          <Settings className="h-4 w-4" />
-          <span>Configurer Règles</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          <button 
+            onClick={() => setShowNewRuleModal(true)}
+            className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-md flex items-center space-x-2"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Nouvelle Règle</span>
+          </button>
+          <button className="bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center space-x-2">
+            <Download className="h-4 w-4" />
+            <span>Exporter Rapport</span>
+          </button>
+        </div>
       </div>
 
       {/* Statistiques */}
@@ -279,6 +297,8 @@ export default function ConformiteModule() {
                   value={selectedType}
                   onChange={(e) => setSelectedType(e.target.value)}
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  aria-label="Filtrer par type de violation"
+                  title="Sélectionner une option"
                 >
                   <option value="Tous">Toutes les sévérités</option>
                   <option value="Bloquant">Bloquant</option>
@@ -400,10 +420,19 @@ export default function ConformiteModule() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex items-center space-x-2">
-                            <button className="text-blue-600 hover:text-blue-900">
-                              Modifier
+                            <button 
+                              onClick={() => {
+                                setSelectedRule(regle);
+                                setShowEditRuleModal(true);
+                              }}
+                              className="text-blue-600 hover:text-blue-900 flex items-center space-x-1"
+                            >
+                              <Edit className="h-3 w-3" />
+                              <span>Modifier</span>
                             </button>
-                            <button className={`${
+                            <button 
+                              onClick={() => console.log('Toggle statut:', regle.id)}
+                              className={`flex items-center space-x-1 ${
                               regle.statut === 'Actif' ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'
                             }`}>
                               {regle.statut === 'Actif' ? 'Désactiver' : 'Activer'}
@@ -443,6 +472,207 @@ export default function ConformiteModule() {
           )}
         </div>
       </div>
+
+      {/* Modal Nouvelle Règle */}
+      {showNewRuleModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-8 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+              <Plus className="h-6 w-6 mr-2 text-green-600" />
+              Créer une Nouvelle Règle de Conformité
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nom de la règle *
+                </label>
+                <input
+                  type="text"
+                  value={newRule.nom}
+                  onChange={(e) => setNewRule({...newRule, nom: e.target.value})}
+                  placeholder="Ex: Vérification seuil approbation..."
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description *
+                </label>
+                <textarea
+                  value={newRule.description}
+                  onChange={(e) => setNewRule({...newRule, description: e.target.value})}
+                  placeholder="Décrivez en détail la règle de conformité..."
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  rows={4}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Type *
+                  </label>
+                  <select
+                    value={newRule.type}
+                    onChange={(e) => setNewRule({...newRule, type: e.target.value as any})}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="Budgétaire">Budgétaire</option>
+                    <option value="Documentaire">Documentaire</option>
+                    <option value="Procédurale">Procédurale</option>
+                    <option value="Seuil">Seuil</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Sévérité *
+                  </label>
+                  <select
+                    value={newRule.severite}
+                    onChange={(e) => setNewRule({...newRule, severite: e.target.value as any})}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="Bloquant">Bloquant</option>
+                    <option value="Avertissement">Avertissement</option>
+                    <option value="Information">Information</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h4 className="text-sm font-bold text-blue-900 mb-2">Informations sur les types</h4>
+                <ul className="text-xs text-blue-800 space-y-1">
+                  <li><strong>Budgétaire:</strong> Contrôles liés aux dépassements et disponibilités budgétaires</li>
+                  <li><strong>Documentaire:</strong> Vérification de la présence des pièces justificatives</li>
+                  <li><strong>Procédurale:</strong> Respect des processus et workflows établis</li>
+                  <li><strong>Seuil:</strong> Contrôles basés sur des montants ou valeurs limites</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowNewRuleModal(false);
+                  setNewRule({ nom: '', description: '', type: 'Budgétaire', severite: 'Bloquant' });
+                }}
+                className="px-6 py-2.5 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium transition-all"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => {
+                  console.log('Nouvelle règle:', newRule);
+                  setShowNewRuleModal(false);
+                  setNewRule({ nom: '', description: '', type: 'Budgétaire', severite: 'Bloquant' });
+                }}
+                disabled={!newRule.nom || !newRule.description}
+                className="px-6 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all shadow-md"
+              >
+                Créer la Règle
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Modification Règle */}
+      {showEditRuleModal && selectedRule && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-8 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+              <Edit className="h-6 w-6 mr-2 text-blue-600" />
+              Modifier la Règle de Conformité
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nom de la règle *
+                </label>
+                <input
+                  type="text"
+                  defaultValue={selectedRule.nom}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description *
+                </label>
+                <textarea
+                  defaultValue={selectedRule.description}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  rows={4}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Type *
+                  </label>
+                  <select
+                    defaultValue={selectedRule.type}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="Budgétaire">Budgétaire</option>
+                    <option value="Documentaire">Documentaire</option>
+                    <option value="Procédurale">Procédurale</option>
+                    <option value="Seuil">Seuil</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Sévérité *
+                  </label>
+                  <select
+                    defaultValue={selectedRule.severite}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="Bloquant">Bloquant</option>
+                    <option value="Avertissement">Avertissement</option>
+                    <option value="Information">Information</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                <p className="text-xs text-yellow-800">
+                  <strong>Attention:</strong> La modification de cette règle affectera tous les contrôles futurs.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowEditRuleModal(false);
+                  setSelectedRule(null);
+                }}
+                className="px-6 py-2.5 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium transition-all"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => {
+                  console.log('Règle modifiée:', selectedRule.id);
+                  setShowEditRuleModal(false);
+                  setSelectedRule(null);
+                }}
+                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 font-medium transition-all shadow-md"
+              >
+                Enregistrer les Modifications
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

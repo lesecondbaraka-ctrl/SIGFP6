@@ -29,7 +29,7 @@ if (supabaseUrl && supabaseAnonKey) {
   };
 
   // Log to help debugging when running without Supabase env configured
-  console.warn('Supabase env vars not found: running with a lightweight supabase stub (no remote DB).');
+  console.info('Supabase non configuré: utilisation d\'un client stub (dev/local sans variables VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY).');
 }
 
 export { supabase };

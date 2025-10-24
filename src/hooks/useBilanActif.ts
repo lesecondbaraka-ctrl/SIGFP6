@@ -1,7 +1,6 @@
-
 import { useState, useEffect} from 'react';
 import { supabase } from '../lib/supabase';
-import { BilanActif } from '../types/finance';
+import type { BilanActif } from '../types/finance';
 export const useBilanActif = (exerciceId: string) => {
   const [actif, setActif] = useState<BilanActif[]>([]);
   const [loading, setLoading] = useState(true);
@@ -12,7 +11,7 @@ export const useBilanActif = (exerciceId: string) => {
       .select('*')
       .eq('exercice_id', exerciceId)
       .order('ordre')
-      .then(({ data, error }) => {
+      .then(({ data, error }: { data: any; error: any }) => {
         if (error) console.error(error);
         setActif(data || []);
         setLoading(false);

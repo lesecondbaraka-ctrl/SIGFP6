@@ -2,11 +2,7 @@ import React, { useState } from 'react';
 import { Shield, User, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
-interface LoginFormProps {
-  onLogin: (credentials: { username: string; password: string; role: string; entity: string }) => void;
-}
-
-export default function LoginForm({ onLogin }: LoginFormProps) {
+export default function LoginForm() {
   const [formData, setFormData] = useState({
     email: '',
     password: '', 

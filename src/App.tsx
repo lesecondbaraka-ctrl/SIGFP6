@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { AuthProvider, useAuth } from './hooks/useAuth.tsx';
+import { DataProvider } from './contexts/DataContext';
+import './styles/progress-bars.css';
 import {
   useAlerts,
   useBudgetItems,
@@ -20,14 +22,16 @@ import ControlModule from './components/Modules/ControlModule';
 import DepensesModule from './components/Modules/DepensesModule';
 import RecettesModule from './components/Modules/RecettesModule';
 import TresorerieModule from './components/Modules/TresorerieModule';
-import AuditModule from './components/Modules/AuditModule';
 import RHModule from './components/Modules/RHModule';
 import ArchivageModule from './components/Modules/ArchivageModule';
 import ValidationModule from './components/Modules/ValidationModule';
-import ConformiteModule from './components/Modules/ConformiteModule';
-import JournalModule from './components/Modules/JournalModule';
+import ComptabiliteModule from './components/Modules/ComptabiliteModule';
 import EtatsFinanciersModule from './components/Modules/EtatsFinanciersModule';
 import IGFModule from './components/Modules/IGFModule';
+import FraudeDetectionModule from './components/Modules/FraudeDetectionModule';
+import TransparencePubliqueModule from './components/Modules/TransparencePubliqueModule';
+import ConformiteModule from './components/Modules/ConformiteModule';
+import AuditReportingModule from './components/Modules/AuditReportingModule';
 
 import {
   PieChart,
@@ -41,13 +45,12 @@ import {
 
 // Composant principal de l'application
 function AppContent() {
-  console.log('AppContent render');
-  const { authState, logout } = useAuth();
+    const { authState, logout } = useAuth();
   const [activeModule, setActiveModule] = useState('dashboard');
 
   // Si pas authentifié, afficher le formulaire de connexion
   if (!authState.isAuthenticated) {
-    return <LoginForm onLogin={() => {}} />;
+    return <LoginForm />;
   }
 
   // Si en cours de chargement
@@ -132,6 +135,15 @@ function MainApp({
     masseSalariale: agentsTyped.reduce((sum: number, agent: Agent) => sum + (agent.salaire_net || 0), 0),
   };
 
+  // Map percentage to Tailwind width classes to avoid inline styles
+  const getWidthClass = (pct: number) => {
+    if (pct <= 0) return 'w-0';
+    if (pct <= 25) return 'w-1/4';
+    if (pct <= 50) return 'w-2/4';
+    if (pct <= 75) return 'w-3/4';
+    return 'w-full';
+  };
+
   const formatCurrency = (amount: number) => {
     if (amount >= 1_000_000_000) {
       return `${(amount / 1_000_000_000).toFixed(1)}T CDF`;
@@ -150,6 +162,8 @@ function MainApp({
     switch (activeModule) {
       case 'budget':
         return hasPermission('GESTION_BUDGET') ? <BudgetModule /> : <AccessDenied />;
+      case 'comptabilite':
+        return <ComptabiliteModule />;
       case 'depenses':
         return hasPermission('GESTION_DEPENSES') ? <DepensesModule /> : <AccessDenied />;
       case 'recettes':
@@ -158,11 +172,15 @@ function MainApp({
         return hasPermission('GESTION_TRESORERIE') ? <TresorerieModule /> : <AccessDenied />;
       case 'controle':
         return hasPermission('CONTROLE_INTERNE') ? <ControlModule /> : <AccessDenied />;
-      case 'igf':
-        return user.role === 'IGF' ? <IGFModule /> : <AccessDenied />;
       case 'audit':
-        return <AuditModule />;
-      case 'rh':
+        return hasPermission('AUDIT_REPORTING') ? <AuditReportingModule /> : <AccessDenied />;
+      case 'igf':
+        return <IGFModule />;
+      case 'fraude':
+        return <FraudeDetectionModule />;
+      case 'transparence':
+        return <TransparencePubliqueModule />;
+      case 'rh-enhanced':
         return <RHModule />;
       case 'archivage':
         return <ArchivageModule />;
@@ -170,12 +188,20 @@ function MainApp({
         return <ValidationModule />;
       case 'conformite':
         return <ConformiteModule />;
-      case 'journal':
-        return <JournalModule />;
+      
       case 'etats':
         return <EtatsFinanciersModule />;
       case 'dashboard':
       default:
+        const budgetExecPct = Math.round(
+          Math.min(
+            100,
+            dashboardStats.budgetTotal > 0
+              ? (dashboardStats.budgetExecute / Math.max(1, dashboardStats.budgetTotal)) * 100
+              : 0
+          )
+        );
+        const budgetExecText = `Exécution: ${budgetExecPct}%`;
         return (
           <div className="space-y-6">
             <div>
@@ -244,6 +270,79 @@ function MainApp({
                     Voir Détails des Contrôles
                   </button>
                 </div>
+              </div>
+            </div>
+
+            {/* Budget vs Réalisé */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">Budget vs Réalisé</h3>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-2">Budget Total Alloué</p>
+                    <p className="text-2xl font-bold text-gray-900">{formatCurrency(dashboardStats.budgetTotal)}</p>
+                    <progress className="sr-only" value={budgetExecPct} max={100} aria-label="Pourcentage d'exécution du budget"></progress>
+                    <div
+                      className="mt-2 h-2 w-full bg-gray-200 rounded-full"
+                      title={budgetExecText}
+                    >
+                      <div
+                        className={`h-2 bg-blue-600 rounded-full ${getWidthClass(budgetExecPct)}`}
+                      />
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">Exécuté: {formatCurrency(dashboardStats.budgetExecute)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-2">Dépenses vs Recettes</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p className="text-xs text-red-700">Dépenses</p>
+                        <p className="text-lg font-bold text-red-900">{formatCurrency(dashboardStats.depensesTotal)}</p>
+                      </div>
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                        <p className="text-xs text-green-700">Recettes</p>
+                        <p className="text-lg font-bold text-green-900">{formatCurrency(dashboardStats.recettesTotal)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Dernières transactions */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">Dernières Transactions</h3>
+              </div>
+              <div className="p-6">
+                {transactionsTyped && transactionsTyped.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Référence</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Montant</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {transactionsTyped.slice(0, 5).map((t: any, idx: number) => (
+                          <tr key={`txn-${idx}`} className="hover:bg-gray-50">
+                            <td className="px-6 py-3 text-sm text-gray-700">{t?.date || '-'}</td>
+                            <td className="px-6 py-3 text-sm text-gray-900">{t?.reference || t?.id || '-'}</td>
+                            <td className="px-6 py-3 text-sm font-medium text-gray-900">{formatCurrency(t?.montant || 0)}</td>
+                            <td className="px-6 py-3 text-sm text-gray-700">{t?.statut || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-600">Aucune transaction récente.</p>
+                )}
               </div>
             </div>
 
@@ -395,13 +494,15 @@ interface Agent {
   statut: string;
 }
 
-// App principale avec AuthProvider
+// App principale avec AuthProvider et DataProvider
 export default function App() {
   return (
     <AuthProvider>
-      <ErrorBoundary>
-        <AppContent />
-      </ErrorBoundary>
+      <DataProvider>
+        <ErrorBoundary>
+          <AppContent />
+        </ErrorBoundary>
+      </DataProvider>
     </AuthProvider>
   );
 }

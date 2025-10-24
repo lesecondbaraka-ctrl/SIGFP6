@@ -30,7 +30,11 @@ export default function Header({ currentUser, onLogout }: HeaderProps) {
           </div>
           
           <div className="flex items-center space-x-4">
-            <button className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
+            <button
+              className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+              aria-label="Ouvrir les notifications"
+              title="Notifications"
+            >
               <Bell className="h-5 w-5" />
               {unreadNotifications > 0 && (
                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
@@ -52,6 +56,8 @@ export default function Header({ currentUser, onLogout }: HeaderProps) {
             <button 
               onClick={onLogout}
               className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+              aria-label="Se déconnecter"
+              title="Déconnexion"
             >
               <LogOut className="h-5 w-5" />
             </button>

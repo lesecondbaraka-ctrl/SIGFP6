@@ -13,6 +13,18 @@ dist
 dist-ssr
 *.local
 
+# Fichiers compilés TypeScript (ne pas versionner)
+**/dist/
+**/*.js
+**/*.js.map
+
+# Exceptions (fichiers JS légitimes de configuration)
+!vite.config.js
+!tailwind.config.js
+!postcss.config.js
+!*.config.js
+!scripts/*.js
+
 # Environment files
 .env
 .env.local
