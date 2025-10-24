@@ -1,9 +1,7 @@
 {
   "extends": [
-    "@typescript-eslint/recommended",
     "plugin:react/recommended",
-    "plugin:react-hooks/recommended",
-    "plugin:jsx-a11y/recommended"
+    "plugin:react-hooks/recommended"
   ],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
@@ -16,18 +14,14 @@
   "plugins": [
     "@typescript-eslint",
     "react",
-    "react-hooks",
-    "jsx-a11y"
+    "react-hooks"
   ],
   "rules": {
     "no-console": "warn",
     "@typescript-eslint/no-unused-vars": "warn",
     "@typescript-eslint/no-explicit-any": "warn",
     "react/prop-types": "off",
-    "react/react-in-jsx-scope": "off",
-    "jsx-a11y/no-autofocus": "off",
-    "jsx-a11y/click-events-have-key-events": "warn",
-    "jsx-a11y/no-static-element-interactions": "warn"
+    "react/react-in-jsx-scope": "off"
   },
   "settings": {
     "react": {

@@ -9,9 +9,7 @@ import { useFluxTresorerie } from '../../hooks/useFluxTresorerie';
 import { useRatiosFinanciers } from '../../hooks/useRatiosFinanciers';
 import { prepareExcelData } from '../../utils/exportUtils';
 import { RatioFinancier } from '../../types/finance';
-import { useReactToPrint } from 'react-to-print';
 import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
 
 const tabs = ['Dashboard Consolidé', 'Intégration', 'Bilan', 'Compte de Résultat', 'Flux de Trésorerie', 'Indicateurs', 'Analyse Financière'];
 
@@ -468,18 +466,28 @@ export default function EtatsFinanciersModule() {
     });
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
-    saveAs(blob, `Etats_Financiers_${selectedExercice}.xlsx`);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Etats_Financiers_${selectedExercice}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
-  type ReactToPrintProps = {
-    content: () => HTMLElement | null;
-    documentTitle?: string;
+  const handlePrint = () => {
+    if (printRef.current) {
+      const printWindow = window.open('', '', 'width=800,height=600');
+      if (printWindow) {
+        printWindow.document.write('<html><head><title>Etats Financiers</title>');
+        printWindow.document.write('<style>body { font-family: Arial, sans-serif; } table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f2f2f2; }</style>');
+        printWindow.document.write('</head><body>');
+        printWindow.document.write(printRef.current.innerHTML);
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.print();
+      }
+    }
   };
-
-  const handlePrint = useReactToPrint({
-    documentTitle: `Etats_Financiers_${selectedExercice}`,
-    content: () => printRef.current
-  } as ReactToPrintProps);
 
   return (
     <div className="p-6 space-y-6">
